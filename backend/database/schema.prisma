@@ -1,0 +1,60 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+model User {
+  id            Int            @id @default(autoincrement())
+  email         String         @unique
+  name          String
+  password      String
+  role          Role           @default(USER)
+  registrations Registration[]
+}
+
+model Event {
+  id            Int            @id @default(autoincrement())
+  event         String         @unique
+  date          DateTime
+  description   String
+  registrations Registration[]
+}
+
+model Registration {
+  id            Int      @id @default(autoincrement())
+  createdAt     DateTime @default(now())
+  name          String // Can be individual name or team name
+  gender        String
+  contact       String // Changed from Int to String
+  address       String
+  transactionId String
+  bankingName   String // Made optional
+  paymentUrl    String
+  approved      Boolean  @default(false)
+
+  user   User @relation(fields: [userId], references: [id])
+  userId Int
+
+  event   Event @relation(fields: [eventId], references: [id])
+  eventId Int
+
+  team Team[]
+}
+
+model Team {
+  id       Int    @id @default(autoincrement())
+  teamName String // Name of the team (redundant but useful for queries)
+  players  Json // Store player details as JSON (name, gender, gameId,teamLeader)
+
+  registration   Registration @relation(fields: [registrationId], references: [id])
+  registrationId Int
+}
