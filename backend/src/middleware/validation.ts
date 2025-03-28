@@ -33,7 +33,7 @@ export const validate = (
       next();
     }
   } catch {
-    res.status(403).json({ message: "Forbidden" });
+    res.status(403).json({ message: "Forbidden", notlogin: true });
   }
 };
 
@@ -50,3 +50,13 @@ export const passwordSchema = z
 export const stringSchema = z.string();
 export const contactSchema = z.string().min(10).max(10);
 export const genderSchema = z.enum(["male", "female", "other"]);
+export const booleanSchema =z.boolean()
+const playerSchema = z.object({
+  name: z.string(),
+  gender: z.enum(["male", "female", "other"]),
+  gameId:z.string(),
+  teamLeader: z.boolean()
+});
+
+export const playersSchema = z.array(playerSchema);
+

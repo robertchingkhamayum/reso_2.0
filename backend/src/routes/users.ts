@@ -4,9 +4,11 @@ import { PrismaClient, Prisma } from "@prisma/client";
 import {
   userSignupMiddleware,
   userSigninMiddleware,
+  userRegisterMiddleware,
 } from "../middleware/usersMiddleware";
 import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
+import { validate } from "../middleware/validation";
 dotenv.config();
 
 const prisma = new PrismaClient();
@@ -83,4 +85,6 @@ router.post(
   }
 );
 
+//user event registration
+router.post("/register",validate,userRegisterMiddleware,async(req:Request,res:Response)=>{})
 export default router;

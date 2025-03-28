@@ -24,7 +24,7 @@ model User {
 model Event {
   id            Int            @id @default(autoincrement())
   event         String         @unique
-  date          DateTime
+  date          String
   description   String
   registrations Registration[]
 }
@@ -37,9 +37,10 @@ model Registration {
   contact       String // Changed from Int to String
   address       String
   transactionId String
-  bankingName   String // Made optional
+  bankingName   String
   paymentUrl    String
   approved      Boolean  @default(false)
+  individual    Boolean  @default(true)
 
   user   User @relation(fields: [userId], references: [id])
   userId Int
