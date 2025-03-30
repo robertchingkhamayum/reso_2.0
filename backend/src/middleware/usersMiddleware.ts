@@ -1,4 +1,3 @@
-import jwt from "jsonwebtoken";
 import { Request, Response, NextFunction } from "express";
 import dotenv from "dotenv";
 import {
@@ -8,13 +7,12 @@ import {
   booleanSchema,
   genderSchema,
   playersSchema,
+  contactSchema,
 } from "./validation";
 import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 dotenv.config();
-
-const JWT_SECRET = process.env.JWT_SECRET as string;
 
 interface CostomRequestSignup extends Request {
   email?: string;
@@ -33,15 +31,29 @@ export const userSignupMiddleware = async (
 
     // Validate input using Zod
     const nameParsed = stringSchema.safeParse(name);
-    const emailParsed = emailSchema.safeParse(email);
-    const passwordParsed = passwordSchema.safeParse(password);
+    if (!nameParsed.success) {
+      res.status(400).json({
+        message: "Invalid name",
+        error: nameParsed.error.format()._errors.join(", "),
+      });
+      return;
+    }
 
-    if (
-      !nameParsed.success ||
-      !emailParsed.success ||
-      !passwordParsed.success
-    ) {
-      res.status(400).json({ message: "Please enter correct input" });
+    const emailParsed = emailSchema.safeParse(email);
+    if (!emailParsed.success) {
+      res.status(400).json({
+        message: "Invalid email",
+        error: emailParsed.error.format()._errors.join(", "),
+      });
+      return;
+    }
+
+    const passwordParsed = passwordSchema.safeParse(password);
+    if (!passwordParsed.success) {
+      res.status(400).json({
+        message: "Invalid password",
+        error: passwordParsed.error.format()._errors.join(", "),
+      });
       return;
     }
 
@@ -66,8 +78,8 @@ export const userSignupMiddleware = async (
 
 interface CostomRequestSignin extends Request {
   email?: string;
-  password?: string;
-  role?: "USER";
+  name?: string;
+  userId?: number;
 }
 
 //user signin Middleware
@@ -81,10 +93,20 @@ export const userSigninMiddleware = async (
 
     // Validate input using Zod
     const emailParsed = emailSchema.safeParse(email);
-    const passwordParsed = passwordSchema.safeParse(password);
+    if (!emailParsed.success) {
+      res.status(400).json({
+        message: "Invalid email",
+        error: emailParsed.error.format()._errors.join(", "),
+      });
+      return;
+    }
 
-    if (!emailParsed.success || !passwordParsed.success) {
-      res.status(400).json({ message: "Please enter correct input" });
+    const passwordParsed = passwordSchema.safeParse(password);
+    if (!passwordParsed.success) {
+      res.status(400).json({
+        message: "Invalid password",
+        error: passwordParsed.error.format()._errors.join(", "),
+      });
       return;
     }
 
@@ -103,12 +125,9 @@ export const userSigninMiddleware = async (
       res.status(403).json({ message: "Forbidden: Incorrect credential" });
       return;
     }
-    if (!(user.role === "USER")) {
-      res.status(403).json({ message: "Forbidden: You're not a user" });
-      return;
-    }
     req.email = user.email;
-    req.role = user.role;
+    req.name = user.name;
+    req.userId = user.id;
     next();
   } catch (error) {
     res.status(500).json({ message: "Internal server error", error });
@@ -122,11 +141,11 @@ interface Player {
   teamLeader: boolean;
 }
 
-interface CostomRequest extends Request {
+interface CustomRequest extends Request {
   email?: string;
   role?: "USER";
   event?: string;
-  gender?: string;
+  gender?: "male" | "female" | "other" | null;
   name?: string;
   contact?: string;
   address?: string;
@@ -135,38 +154,23 @@ interface CostomRequest extends Request {
   players?: Player[];
   bankingName?: string;
   transactionId?: string;
-  paymentProof?: File;
+  paymentProof?: string;
+  eventId?:number
 }
 
-interface RequestBodyIndividual {
-  event?: string;
-  gender?: string;
-  name?: string;
-  contact?: string;
-  address?: string;
-  bankingName?: string;
-  transactionId?: string;
-  paymentProof?: File;
-  individual?: boolean;
-}
-
-interface RequestBodyTeam extends RequestBodyIndividual {
-  teamName?: string;
-  players?: Player[];
-}
-
-//user register Middleware
+//user event register Middleware
 export const userRegisterMiddleware = async (
-  req: CostomRequest,
+  req: CustomRequest,
   res: Response,
   next: NextFunction
 ) => {
   try {
-    const { email, role } = req;
+    const { role } = req;
     if (role !== "USER") {
-      res.status(403).json({ message: "Forbidden: You're not an USER" });
+      res.status(403).json({ message: "Forbidden: You're not a USER" });
       return;
     }
+
     const {
       event,
       name,
@@ -177,33 +181,91 @@ export const userRegisterMiddleware = async (
       transactionId,
       bankingName,
       paymentProof,
-    } = req.body as RequestBodyIndividual;
+    } = req.body;
 
-    //input validation through zod
+    // Input validation using Zod
     const individualParsed = booleanSchema.safeParse(individual);
-    const eventParsed = stringSchema.safeParse(event);
-    const nameParsed = stringSchema.safeParse(name);
-    const contactParsed = stringSchema.safeParse(contact);
-    const addressParsed = stringSchema.safeParse(address);
-    const genderParsed = genderSchema.safeParse(gender);
-    const transactionIdParsed = stringSchema.safeParse(transactionId);
-    const bankingNameParsed = stringSchema.safeParse(bankingName);
-    if (
-      !(
-        eventParsed.success &&
-        individualParsed.success &&
-        nameParsed.success &&
-        contactParsed.success &&
-        addressParsed.success &&
-        genderParsed.success &&
-        transactionIdParsed.success &&
-        bankingNameParsed.success
-      )
-    ) {
-      res.status(400).json({ message: "Please enter correct input" });
+    if (!individualParsed.success) {
+      res.status(400).json({
+        message: "Invalid individual input",
+        error: individualParsed.error.format()._errors.join(", "),
+      });
       return;
     }
-    //event exist check
+
+    const eventParsed = stringSchema.safeParse(event);
+    if (!eventParsed.success) {
+      res.status(400).json({
+        message: "Invalid event",
+        error: eventParsed.error.format()._errors.join(", "),
+      });
+      return;
+    }
+
+    const nameParsed = stringSchema.safeParse(name);
+    if (!nameParsed.success) {
+      res.status(400).json({
+        message: "Invalid name",
+        error: nameParsed.error.format()._errors.join(", "),
+      });
+      return;
+    }
+
+    const contactParsed = contactSchema.safeParse(contact);
+    if (!contactParsed.success) {
+      res.status(400).json({
+        message: "Invalid contact",
+        error: contactParsed.error.format()._errors.join(", "),
+      });
+      return;
+    }
+
+    const addressParsed = stringSchema.safeParse(address);
+    if (!addressParsed.success) {
+      res.status(400).json({
+        message: "Invalid address",
+        error: addressParsed.error.format()._errors.join(", "),
+      });
+      return;
+    }
+
+    const genderParsed = genderSchema.safeParse(gender);
+    if (!genderParsed.success) {
+      res.status(400).json({
+        message: "Invalid gender",
+        error: genderParsed.error.format()._errors.join(", "),
+      });
+      return;
+    }
+
+    const transactionIdParsed = stringSchema.safeParse(transactionId);
+    if (!transactionIdParsed.success) {
+      res.status(400).json({
+        message: "Invalid transaction ID",
+        error: transactionIdParsed.error.format()._errors.join(", "),
+      });
+      return;
+    }
+
+    const bankingNameParsed = stringSchema.safeParse(bankingName);
+    if (!bankingNameParsed.success) {
+      res.status(400).json({
+        message: "Invalid banking name",
+        error: bankingNameParsed.error.format()._errors.join(", "),
+      });
+      return;
+    }
+
+    const paymentProofParsed = stringSchema.safeParse(paymentProof);
+    if (!paymentProofParsed.success) {
+      res.status(400).json({
+        message: "Invalid payment proof", // Fixed message
+        error: paymentProofParsed.error.format()._errors.join(", "),
+      });
+      return;
+    }
+
+    // Check if the event exists
     const eventExist = await prisma.event.findUnique({
       where: { event: eventParsed.data! },
     });
@@ -211,7 +273,8 @@ export const userRegisterMiddleware = async (
       res.status(409).json({ message: "Event doesn't exist" });
       return;
     }
-    //putting data to request
+
+    // Attach validated data to request
     req.event = eventParsed.data;
     req.name = nameParsed.data;
     req.gender = genderParsed.data;
@@ -219,10 +282,13 @@ export const userRegisterMiddleware = async (
     req.address = addressParsed.data;
     req.transactionId = transactionIdParsed.data;
     req.bankingName = bankingNameParsed.data;
+    req.paymentProof = paymentProofParsed.data;
+    req.eventId = event.id
 
-    //check type of registration
-    if (!individual) {
-      let { teamName, players } = req.body as RequestBodyTeam;
+    // If it's a team registration, validate team-specific fields
+    if (!individualParsed.data!) {
+      let { teamName, players } = req.body;
+
       if (typeof players === "string") {
         try {
           players = JSON.parse(players); // Convert JSON string to object
@@ -231,18 +297,18 @@ export const userRegisterMiddleware = async (
           return;
         }
       }
+
       // Validate team name & players
       const teamNameParsed = stringSchema.safeParse(teamName);
       const playersParsed = playersSchema.safeParse(players);
 
-      if (!(teamNameParsed.success && playersParsed.success)) {
-        res.status(400).json({ message: "Please enter correct input" });
+      if (!teamNameParsed.success || !playersParsed.success) {
+        res.status(400).json({ message: "Invalid team registration details" });
         return;
       }
 
       req.teamName = teamNameParsed.data;
       req.players = playersParsed.data;
-      // next();
     }
 
     next();

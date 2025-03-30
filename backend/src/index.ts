@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import users from "./routes/users";
 import admin from "./routes/admin";
+import superadmin from "./routes/superadmin";
 import jwt from "jsonwebtoken";
 import dotenv from "dotenv"
 dotenv.config()
@@ -32,6 +33,7 @@ app.get("/islogIn",(req,res)=>{
 })
 app.use("/users", users);
 app.use("/admin", admin);
+app.use("/sadmin", superadmin);
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
