@@ -126,6 +126,7 @@ router.post(
   async (req: CostomRequest, res: Response) => {
     try {
       const {
+        email,
         userId,
         eventId,
         gender,
@@ -193,7 +194,14 @@ router.post(
           },
         });
 
-        return [registration, team];
+        const eventUser = await prisma.eventUser.create({
+          data:{
+            eventId: eventId!,
+            registrationId: registration.id,
+            email: email!
+          }
+        })
+        return [registration, team, eventUser];
       });
       res.status(201).json({
         message: "Team registration successful",
