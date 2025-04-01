@@ -74,4 +74,32 @@ router.put(
   }
 );
 
+
+interface CustomRequestGetEvent extends Request {
+  adminId?: number;
+}
+router.get(
+  "/event",
+  adminValidate,
+  async (req: CustomRequestGetEvent, res: Response) => {
+    const { adminId } = req;
+    try {
+      const eventDetails = await prisma.admin.findUnique({
+        where: { id: adminId },
+        include:{
+          event:true
+        }
+      });
+
+      res
+        .status(200)
+        .json({ message: "Get details  successfully", eventDetails });
+      return;
+    } catch (error) {
+      res.status(500).json({ message: "Internal Server Error", error });
+      return;
+    }
+  }
+);
+
 export default router;

@@ -215,4 +215,32 @@ router.post(
   }
 );
 
+interface CustomRequestRegister extends Request {
+  email?: string;
+}
+router.get(
+  "/registered",
+  userValidate,
+  async (req: CustomRequestRegister, res: Response) => {
+    const { email } = req;
+    try {
+      const registeredDetails = await prisma.eventUser.findUnique({
+        where: { email: email },
+        include:{
+          event:true,
+          registration:true
+        }
+      });
+
+      res
+        .status(200)
+        .json({ message: "Get details  successfully", registeredDetails });
+      return;
+    } catch (error) {
+      res.status(500).json({ message: "Internal Server Error", error });
+      return;
+    }
+  }
+);
+
 export default router;

@@ -283,7 +283,7 @@ export const userRegisterMiddleware = async (
     req.transactionId = transactionIdParsed.data;
     req.bankingName = bankingNameParsed.data;
     req.paymentProof = paymentProofParsed.data;
-    req.eventId = event.id
+    req.eventId = eventExist.id
 
     // If it's a team registration, validate team-specific fields
     if (!individualParsed.data!) {

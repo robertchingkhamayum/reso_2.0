@@ -22,11 +22,11 @@ export const adminSigninMiddleware = async (
   next: NextFunction
 ) => {
   try {
-    const { email, password } = req.body;
+    const { adminEmail, adminPassword } = req.body;
 
     // Validate input using Zod
-    const emailParsed = emailSchema.safeParse(email);
-    const passwordParsed = passwordSchema.safeParse(password);
+    const emailParsed = emailSchema.safeParse(adminEmail);
+    const passwordParsed = passwordSchema.safeParse(adminPassword);
 
     if (!emailParsed.success || !passwordParsed.success) {
       res.status(400).json({ message: "Please enter correct input" });
