@@ -44,16 +44,7 @@ const EventRegistered = () => {
     };
     register();
   }, []);
-  const istTime = new Date("2025-03-31T15:52:41.231Z").toLocaleString("en-IN", {
-    timeZone: "Asia/Kolkata",
-    year: "numeric",
-    month: "long", // or "2-digit"
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: true, // optional: true for AM/PM
-  });
+
   return (
     <div>
       {eventsRegistered && eventsRegistered.length > 0 ? (
