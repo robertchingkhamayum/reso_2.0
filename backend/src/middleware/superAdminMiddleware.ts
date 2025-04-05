@@ -1,6 +1,11 @@
 import { Request, Response, NextFunction } from "express";
 import dotenv from "dotenv";
-import { emailSchema, stringSchema, passwordSchema } from "./validation";
+import {
+  emailSchema,
+  stringSchema,
+  passwordSchema,
+  numberSchema,
+} from "./validation";
 import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
@@ -107,6 +112,7 @@ interface CustomRequest extends Request {
   adminPassword?: string;
   event?: string;
   date?: string;
+  fee?:number
   description?: string;
   paymentQr?: string;
 }
@@ -145,6 +151,7 @@ export const createEventWithAdmin = async (
       date,
       description,
       paymentQr,
+      fee,
     } = req.body;
 
     // Parsing the input values using Zod
@@ -156,7 +163,14 @@ export const createEventWithAdmin = async (
       });
       return;
     }
-
+    const feeParse = numberSchema.safeParse(fee);
+    if (!feeParse.success) {
+      res.status(400).json({
+        message: "Invalid fee",
+        error: feeParse.error.format()._errors.join(", "),
+      });
+      return;
+    }
     const adminEmailParsed = emailSchema.safeParse(adminEmail);
     if (!adminEmailParsed.success) {
       res.status(400).json({
@@ -239,6 +253,7 @@ export const createEventWithAdmin = async (
     req.date = dateParsed.data;
     req.description = descriptionParsed.data;
     req.paymentQr = paymentQrParsed.data;
+    req.fee = feeParse.data
 
     next();
   } catch (error) {

@@ -95,6 +95,7 @@ interface CostomRequest extends Request {
   date?: string;
   description?: string;
   paymentQr?: string;
+  fee?: number
 }
 
 router.post(
@@ -111,6 +112,7 @@ router.post(
         date,
         description,
         paymentQr,
+        fee,
       } = req;
       const { newEvent, newAdmin } = await prisma.$transaction(async (prisma) => {
         const newEvent = await prisma.event.create({
@@ -118,6 +120,7 @@ router.post(
             event: event ?? "",
             date: date ?? "",
             description: description ?? "",
+            fee:String(fee)?? "",
             paymentQr: paymentQr ?? "",
           },
         });

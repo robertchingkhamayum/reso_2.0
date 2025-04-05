@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { Request, Response } from "express";
-import { PrismaClient, Prisma } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
 import {
   userSignupMiddleware,
   userSigninMiddleware,
@@ -269,6 +269,8 @@ router.get(
 interface CustomRequestCheck extends Request {
   email?: string;
 }
+
+// check user is regitered to a specific event or not
 router.get(
   "/check",
   userValidate,

@@ -2,7 +2,6 @@ import { Request, Response, NextFunction } from "express";
 import dotenv from "dotenv";
 import { emailSchema, stringSchema, passwordSchema, numberSchema } from "./validation";
 import { PrismaClient, Event } from "@prisma/client";
-import { stringify } from "querystring";
 
 const prisma = new PrismaClient();
 dotenv.config();
@@ -172,7 +171,7 @@ export const adminEventMiddleware = async (
       const feeParse = numberSchema.safeParse(fee);
       if (!feeParse.success) {
         res.status(400).json({
-          message: "Invalid date",
+          message: "Invalid fee",
           error: feeParse.error.format()._errors.join(", "),
         });
         return;
