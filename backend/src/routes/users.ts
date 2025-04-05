@@ -106,7 +106,7 @@ interface CostomRequest extends Request {
   event?: string;
   eventId?: number;
   userId?: number;
-  gender?: "male" | "female" | "other"| null;
+  gender?: "male" | "female" | "other" | null;
   name?: string;
   contact?: string;
   address?: string;
@@ -195,12 +195,12 @@ router.post(
         });
 
         const eventUser = await prisma.eventUser.create({
-          data:{
+          data: {
             eventId: eventId!,
             registrationId: registration.id,
-            email: email!
-          }
-        })
+            email: email!,
+          },
+        });
         return [registration, team, eventUser];
       });
       res.status(201).json({
@@ -218,18 +218,40 @@ router.post(
 interface CustomRequestRegister extends Request {
   email?: string;
 }
+
+//get user event registered details
 router.get(
   "/registered",
   userValidate,
   async (req: CustomRequestRegister, res: Response) => {
     const { email } = req;
     try {
-      const registeredDetails = await prisma.eventUser.findUnique({
+      const registeredDetails = await prisma.eventUser.findMany({
         where: { email: email },
-        include:{
-          event:true,
-          registration:true
-        }
+        select: {
+          email: true,
+          registrationId: true,
+          event: {
+            select: {
+              event: true,
+              date: true,
+              description: true,
+            },
+          },
+          registration: {
+            select: {
+              createdAt: true,
+              name: true,
+              gender: true,
+              contact: true,
+              address: true,
+              transactionId: true,
+              bankingName: true,
+              paymentUrl: true,
+              approved: true,
+            },
+          },
+        },
       });
 
       res

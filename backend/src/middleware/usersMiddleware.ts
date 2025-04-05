@@ -165,7 +165,7 @@ export const userRegisterMiddleware = async (
   next: NextFunction
 ) => {
   try {
-    const { role } = req;
+    const { role,email } = req;
     if (role !== "USER") {
       res.status(403).json({ message: "Forbidden: You're not a USER" });
       return;
@@ -182,7 +182,6 @@ export const userRegisterMiddleware = async (
       bankingName,
       paymentProof,
     } = req.body;
-
     // Input validation using Zod
     const individualParsed = booleanSchema.safeParse(individual);
     if (!individualParsed.success) {
@@ -274,8 +273,18 @@ export const userRegisterMiddleware = async (
       return;
     }
 
+    const registeredDetails = await prisma.eventUser.findMany({
+      where: { email: email },
+    });
+    
+    const filtered = registeredDetails.filter(item => item.eventId === eventExist.id);
+    if(filtered){
+      res.status(409).json({ message: "Already registered in this event " });
+      return;
+    }
     // Attach validated data to request
     req.event = eventParsed.data;
+    req.individual = individualParsed.data;
     req.name = nameParsed.data;
     req.gender = genderParsed.data;
     req.contact = contactParsed.data;

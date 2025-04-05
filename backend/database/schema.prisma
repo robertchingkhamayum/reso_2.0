@@ -36,7 +36,7 @@ model Event {
 
 model EventUser {
   id             Int          @id @default(autoincrement())
-  email          String       @unique
+  email          String
   event          Event        @relation(fields: [eventId], references: [id])
   eventId        Int
   registration   Registration @relation(fields: [registrationId], references: [id])
