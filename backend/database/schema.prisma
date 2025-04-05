@@ -27,6 +27,7 @@ model Event {
   id            Int            @id @default(autoincrement())
   event         String         @unique
   date          String
+  fee           String
   description   String
   paymentQr     String
   registrations Registration[]

@@ -1,7 +1,8 @@
 import { Request, Response, NextFunction } from "express";
 import dotenv from "dotenv";
-import { emailSchema, stringSchema, passwordSchema } from "./validation";
+import { emailSchema, stringSchema, passwordSchema, numberSchema } from "./validation";
 import { PrismaClient, Event } from "@prisma/client";
+import { stringify } from "querystring";
 
 const prisma = new PrismaClient();
 dotenv.config();
@@ -74,7 +75,7 @@ export const adminEventMiddleware = async (
 ) => {
   try {
     const { role, email, eventId } = req;
-    const { event, date, description, paymentQr } = req.body;
+    const { event, date, description, paymentQr, fee} = req.body;
 
     if (role !== "ADMIN") {
       res.status(403).json({ message: "Forbidden: You're not an ADMIN" });
@@ -122,6 +123,13 @@ export const adminEventMiddleware = async (
         });
         return;
       }
+      const existingEventCheck = await prisma.event.findUnique({
+        where: { event: eventParse.data! },
+      });
+      if(existingEventCheck){
+        res.status(409).json({message:"Event name already existed"})
+        return
+      }
       updatedData.event = eventParse.data;
     }
 
@@ -160,7 +168,17 @@ export const adminEventMiddleware = async (
       }
       updatedData.paymentQr = paymentQrParse.data;
     }
-
+    if (fee !== undefined) {
+      const feeParse = numberSchema.safeParse(fee);
+      if (!feeParse.success) {
+        res.status(400).json({
+          message: "Invalid date",
+          error: feeParse.error.format()._errors.join(", "),
+        });
+        return;
+      }
+      updatedData.fee = String(feeParse.data);
+    }
     // Attach validated partial update data to request
     req.updatedData = updatedData;
 

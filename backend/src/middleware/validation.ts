@@ -138,3 +138,7 @@ const playerSchema = z.object({
 export const playersSchema = z.array(playerSchema).min(1, {
   message: "At least one player must be provided",
 });
+export const numberSchema = z.preprocess(
+  (val) => Number(val),
+  z.number({ invalid_type_error: "Must be a number" })
+);

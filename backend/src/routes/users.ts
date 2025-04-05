@@ -8,8 +8,9 @@ import {
 } from "../middleware/usersMiddleware";
 import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
-import { userValidate, validate } from "../middleware/validation";
+import { userValidate, stringSchema} from "../middleware/validation";
 dotenv.config();
+
 
 const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET as string;
@@ -257,6 +258,60 @@ router.get(
       res
         .status(200)
         .json({ message: "Get details  successfully", registeredDetails });
+      return;
+    } catch (error) {
+      res.status(500).json({ message: "Internal Server Error", error });
+      return;
+    }
+  }
+);
+
+interface CustomRequestCheck extends Request {
+  email?: string;
+}
+router.get(
+  "/check",
+  userValidate,
+  async (req: CustomRequestCheck, res: Response) => {
+    const { email } = req;
+    const event = req.body;
+    try {
+      //event parsed or validation
+      const eventParsed = stringSchema.safeParse(event);
+          if (!eventParsed.success) {
+            res.status(400).json({
+              message: "Invalid event",
+              error: eventParsed.error.format()._errors.join(", "),
+            });
+            return;
+          }
+      // getting event details
+      const eventExist = await prisma.event.findUnique({
+        where: { event: event },
+      });
+      // checking event exist or not
+      if (!eventExist) {
+        res.status(409).json({ message: "Event doesn't exist" });
+        return;
+      }
+      // getting data for the event registered by the user
+      const registeredDetails = await prisma.eventUser.findMany({
+        where: { email: email },
+      });
+      // filtering out if user already registered or not
+      const filtered = registeredDetails.filter(
+        (item) => item.eventId === eventExist.id
+      );
+      if (filtered) {
+        res.status(409).json({
+          message: "Already registered in this event ",
+          eventRegistered: true,
+        });
+        return;
+      }
+      res
+        .status(200)
+        .json({ message: "Not Registered Yet", fee: eventExist.fee , eventRegistered: false});
       return;
     } catch (error) {
       res.status(500).json({ message: "Internal Server Error", error });
