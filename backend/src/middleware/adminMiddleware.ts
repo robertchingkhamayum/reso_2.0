@@ -1,70 +1,18 @@
-import jwt from "jsonwebtoken";
 import { Request, Response, NextFunction } from "express";
 import dotenv from "dotenv";
-import {
-  emailSchema,
-  stringSchema,
-  passwordSchema,
-} from "./validation";
-import { PrismaClient } from "@prisma/client";
+import { emailSchema, stringSchema, passwordSchema, numberSchema } from "./validation";
+import { PrismaClient, Event } from "@prisma/client";
 
 const prisma = new PrismaClient();
 dotenv.config();
 
-const JWT_SECRET = process.env.JWT_SECRET as string;
-
-interface CostomRequestSignup extends Request {
-  email?: string;
-  name?: string;
-  password?: string;
-}
-
-//admin signup Middleware
-export const adminSignupMiddleware = async (
-  req: CostomRequestSignup,
-  res: Response,
-  next: NextFunction
-) => {
-  try {
-    const { name, email, password } = req.body;
-
-    // Validate input using Zod
-    const nameParsed = stringSchema.safeParse(name);
-    const emailParsed = emailSchema.safeParse(email);
-    const passwordParsed = passwordSchema.safeParse(password);
-
-    if (
-      !nameParsed.success ||
-      !emailParsed.success ||
-      !passwordParsed.success
-    ) {
-      res.status(400).json({ message: "Please enter correct input" });
-      return;
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { email: emailParsed.data! },
-    });
-
-    if (user) {
-      res.status(409).json({ message: "Email already registered" });
-      return;
-    }
-
-    req.name = nameParsed.data;
-    req.email = emailParsed.data;
-    req.password = passwordParsed.data;
-
-    next();
-  } catch (error) {
-    res.status(500).json({ message: "Internal server error", error });
-  }
-};
 
 interface CostomRequestSignin extends Request {
   email?: string;
   password?: string;
   role?: "ADMIN";
+  adminId?: number;
+  eventId?: number;
 }
 
 //admin signin middleware
@@ -74,92 +22,164 @@ export const adminSigninMiddleware = async (
   next: NextFunction
 ) => {
   try {
-    const { email, password } = req.body;
+    const { adminEmail, adminPassword } = req.body;
 
     // Validate input using Zod
-    const emailParsed = emailSchema.safeParse(email);
-    const passwordParsed = passwordSchema.safeParse(password);
+    const emailParsed = emailSchema.safeParse(adminEmail);
+    const passwordParsed = passwordSchema.safeParse(adminPassword);
 
     if (!emailParsed.success || !passwordParsed.success) {
       res.status(400).json({ message: "Please enter correct input" });
       return;
     }
 
-    const user = await prisma.user.findUnique({
+    const admin = await prisma.admin.findUnique({
       where: { email: emailParsed.data! },
     });
-    if (!user) {
-      res.status(409).json({ message: "User doesn't exist" });
+    if (!admin) {
+      res.status(409).json({ message: "Admin doesn't exist" });
       return;
     }
     if (
       !(
-        user.password === passwordParsed.data && user.email === emailParsed.data
+        admin.password === passwordParsed.data &&
+        admin.email === emailParsed.data
       )
     ) {
       res.status(403).json({ message: "Forbidden: Incorrect credential" });
       return;
     }
-    if (!(user.role === "ADMIN")) {
-      res.status(403).json({ message: "Forbidden: You're not an Admin" });
-      return;
-    }
-    req.email = user.email;
-    req.role = user.role;
+    req.email = admin.email;
+    req.adminId = admin.id;
+    req.eventId = admin.eventId;
     next();
   } catch (error) {
     res.status(500).json({ message: "Internal server error", error });
   }
 };
 
-interface CostomRequestEvent extends Request {
+interface CustomRequestEvent extends Request {
   email?: string;
   role?: "ADMIN";
-  event?: string;
-  date?: string;
-  description?: string;
+  adminId?: number;
+  eventId?: number;
+  updatedData?: Partial<Event>;
 }
 
-interface RequestBody {
-  eventLabel?: string;
-  event?: string;
-  date?: string;
-  description?: string;
-}
-
-//admin event create middleware
+//admin event update middleware
 export const adminEventMiddleware = async (
-  req: CostomRequestEvent,
+  req: CustomRequestEvent,
   res: Response,
   next: NextFunction
 ) => {
   try {
-    const { role } = req;
-    const { event, date, description } = req.body as RequestBody;
+    const { role, email, eventId } = req;
+    const { event, date, description, paymentQr, fee} = req.body;
 
     if (role !== "ADMIN") {
       res.status(403).json({ message: "Forbidden: You're not an ADMIN" });
       return;
     }
 
-    const eventParse = stringSchema.safeParse(event);
-    const dateParse = stringSchema.safeParse(date);
-    const descriptionParse = stringSchema.safeParse(description);
-    if (!(eventParse.success && dateParse.success && descriptionParse.success)) {
-      res.status(400).json({ message: "Please enter correct input" });
-      return;
-    }
-    const eventExist = await prisma.event.findUnique({
-      where: { event: eventParse.data! },
+    // Find Admin in Database
+    const admin = await prisma.admin.findUnique({
+      where: { email: email },
     });
 
-    if (eventExist) {
-      res.status(409).json({ message: "Event already exist" });
+    if (!admin) {
+      res.status(409).json({ message: "Admin doesn't exist" });
       return;
     }
-    req.event = eventParse.data;
-    req.date = dateParse.data;
-    req.description = descriptionParse.data;
+
+    // Ensure the Admin is linked to the Event
+    if (!admin.eventId || admin.eventId !== eventId) {
+      res.status(403).json({
+        message:
+          "Forbidden - You're not allowed to change this event's details",
+      });
+      return;
+    }
+
+    // Find the event
+    const existingEvent = await prisma.event.findUnique({
+      where: { id: eventId },
+    });
+
+    if (!existingEvent) {
+      res.status(404).json({ message: "Event not found" });
+      return;
+    }
+
+    // Validate only the fields that are provided
+    const updatedData: Partial<Event> = {};
+
+    if (event !== undefined) {
+      const eventParse = stringSchema.safeParse(event);
+      if (!eventParse.success) {
+        res.status(400).json({
+          message: "Invalid event",
+          error: eventParse.error.format()._errors.join(", "),
+        });
+        return;
+      }
+      const existingEventCheck = await prisma.event.findUnique({
+        where: { event: eventParse.data! },
+      });
+      if(existingEventCheck){
+        res.status(409).json({message:"Event name already existed"})
+        return
+      }
+      updatedData.event = eventParse.data;
+    }
+
+    if (date !== undefined) {
+      const dateParse = stringSchema.safeParse(date);
+      if (!dateParse.success) {
+        res.status(400).json({
+          message: "Invalid date",
+          error: dateParse.error.format()._errors.join(", "),
+        });
+        return;
+      }
+      updatedData.date = dateParse.data;
+    }
+
+    if (description !== undefined) {
+      const descriptionParse = stringSchema.safeParse(description);
+      if (!descriptionParse.success) {
+        res.status(400).json({
+          message: "Invalid description",
+          error: descriptionParse.error.format()._errors.join(", "),
+        });
+        return;
+      }
+      updatedData.description = descriptionParse.data;
+    }
+
+    if (paymentQr !== undefined) {
+      const paymentQrParse = stringSchema.safeParse(paymentQr);
+      if (!paymentQrParse.success) {
+        res.status(400).json({
+          message: "Invalid File Format",
+          error: paymentQrParse.error.format()._errors.join(", "),
+        });
+        return;
+      }
+      updatedData.paymentQr = paymentQrParse.data;
+    }
+    if (fee !== undefined) {
+      const feeParse = numberSchema.safeParse(fee);
+      if (!feeParse.success) {
+        res.status(400).json({
+          message: "Invalid fee",
+          error: feeParse.error.format()._errors.join(", "),
+        });
+        return;
+      }
+      updatedData.fee = String(feeParse.data);
+    }
+    // Attach validated partial update data to request
+    req.updatedData = updatedData;
 
     next();
   } catch (error) {

@@ -7,9 +7,41 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum Role {
-  USER
-  ADMIN
+model Sadmin {
+  id       Int    @id @default(autoincrement())
+  email    String @unique
+  name     String
+  password String
+}
+
+model Admin {
+  id       Int    @id @default(autoincrement())
+  email    String @unique
+  name     String
+  password String
+  event    Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  eventId  Int    @unique // One Admin per Event
+}
+
+model Event {
+  id            Int            @id @default(autoincrement())
+  event         String         @unique
+  date          String
+  fee           String
+  description   String
+  paymentQr     String
+  registrations Registration[]
+  admin         Admin? // This side does NOT need @relation()
+  userEvent     EventUser[]
+}
+
+model EventUser {
+  id             Int          @id @default(autoincrement())
+  email          String
+  event          Event        @relation(fields: [eventId], references: [id])
+  eventId        Int
+  registration   Registration @relation(fields: [registrationId], references: [id])
+  registrationId Int
 }
 
 model User {
@@ -17,24 +49,15 @@ model User {
   email         String         @unique
   name          String
   password      String
-  role          Role           @default(USER)
-  registrations Registration[]
-}
-
-model Event {
-  id            Int            @id @default(autoincrement())
-  event         String         @unique
-  date          String
-  description   String
   registrations Registration[]
 }
 
 model Registration {
   id            Int      @id @default(autoincrement())
   createdAt     DateTime @default(now())
-  name          String // Can be individual name or team name
-  gender        String
-  contact       String // Changed from Int to String
+  name          String
+  gender        String?
+  contact       String
   address       String
   transactionId String
   bankingName   String
@@ -48,13 +71,14 @@ model Registration {
   event   Event @relation(fields: [eventId], references: [id])
   eventId Int
 
-  team Team[]
+  team      Team[]
+  eventUser EventUser[]
 }
 
 model Team {
   id       Int    @id @default(autoincrement())
-  teamName String // Name of the team (redundant but useful for queries)
-  players  Json // Store player details as JSON (name, gender, gameId,teamLeader)
+  teamName String
+  players  Json
 
   registration   Registration @relation(fields: [registrationId], references: [id])
   registrationId Int
